@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.config import settings
+from backend.db import db_backend
 from backend.schemas import SessionData, TurnRequest, TurnResponse, LoginRequest
 from backend.session_manager import (
     create_session, get_session, update_session_auth, revoke_session,
@@ -47,7 +48,8 @@ def health_check():
         "environment": settings.environment,
         "sample_rate": settings.sample_rate,
         "kit_backend": "MOCK (in-memory, not the real KIT API)" if settings.kit_use_mock else "REAL",
-        "kit_key_configured": bool(settings.kit_participant_key)
+        "kit_key_configured": bool(settings.kit_participant_key),
+        "db": db_backend()
     }
 
 @app.post("/api/session")

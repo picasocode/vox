@@ -145,6 +145,7 @@ The React frontend is served by Vercel's CDN and the FastAPI backend runs as a P
    | `KIT_API_BASE_URL` | `https://ht.knowvally.com` | yes |
    | `KIT_PARTICIPANT_KEY` | your college API key | for live data |
    | `KIT_USE_MOCK` | `false` | recommended (omit → mock data) |
+   | `DATABASE_URL` | Neon / Vercel Postgres **pooled** URL | optional — durable sessions & history |
 
 4. **Deploy.** One `*.vercel.app` URL serves everything; microphone permission works automatically (HTTPS).
 
@@ -164,6 +165,7 @@ Use this if you want the backend and frontend as independent Vercel projects (e.
    | `KIT_PARTICIPANT_KEY` | your college API key | live data |
    | `KIT_USE_MOCK` | `false` | recommended |
    | `KIT_FRONTEND_BUILD` | `never` | skips the frontend build inside the API project (handled by `vercel.json`) — it serves only `/api/*` and `/tts/*` |
+   | `DATABASE_URL` | Neon / Vercel Postgres **pooled** URL (e.g. from the Neon integration — it is injected automatically) | optional — durable sessions & history |
 
 4. **Deploy.** Open `https://vox-api-….vercel.app/api/health` — it should return `{"status":"healthy",…}`. Keep this URL.
 
@@ -183,6 +185,7 @@ Use this if you want the backend and frontend as independent Vercel projects (e.
 
 - Local development never needs these variables: `./run.sh` works unchanged, and `npm run dev` proxies to `127.0.0.1:8000`.
 - On Vercel the SQLite database lives in the function's `/tmp` (ephemeral per instance — fine for a demo). Locally it lives next to the code.
+- Set `DATABASE_URL` (Neon or Vercel Postgres, use the **pooled** connection string) to store sessions, history and pending actions in Postgres instead — data then survives cold starts and is shared across instances. `/api/health` reports the active backend as `"db": "postgres"` or `"sqlite"`. Expect ~1 s extra latency on the first request after the database has been idle (Neon suspends unused compute).
 - All environment variables are listed with comments in `.env.example` (repo root) and `backend/.env.example`.
 - CLI alternative: `npm i -g vercel && vercel --prod` from the repo root (Option A).
 
