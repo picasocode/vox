@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "ROOT=/vercel/path0; [ -d \"$ROOT\" ] || ROOT=.; cd \"$ROOT\" && if [ \"$KIT_FRONTEND_BUILD\" = \"never\" ]; then mkdir -p frontend/dist && printf '%s' '<!doctype html><title>KIT VOX API</title><p>KIT VOX API backend is running. The web app is deployed separately.</p><p><a href=/api/health>health check</a></p>' > frontend/dist/index.html && echo '[build] API-only mode (KIT_FRONTEND_BUILD=never), skipped frontend build'; else cd frontend && npm install && npm run build; fi",
+  "buildCommand": "cd /vercel/path0; if [ \"$KIT_FRONTEND_BUILD\" = never ];then mkdir -p frontend/dist;echo '<title>KIT VOX API</title>API only. Web app deployed separately.'>frontend/dist/index.html;else cd frontend && npm i && npm run build;fi",
   "outputDirectory": "frontend/dist",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.py" },
