@@ -3,6 +3,12 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    // Output to <repo-root>/dist so Vercel's default Vite output directory works
+    // without needing an "Output Directory" override in the dashboard.
+    outDir: '../dist',
+    emptyOutDir: true
+  },
   server: {
     port: 5173,
     proxy: {
@@ -17,4 +23,3 @@ export default defineConfig({
     }
   }
 });
-
