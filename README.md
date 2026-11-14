@@ -163,7 +163,7 @@ Use this if you want the backend and frontend as independent Vercel projects (e.
    | `KIT_API_BASE_URL` | `https://ht.knowvally.com` | college API |
    | `KIT_PARTICIPANT_KEY` | your college API key | live data |
    | `KIT_USE_MOCK` | `false` | recommended |
-   | `KIT_FRONTEND_BUILD` | `never` | tells `deploy/build.sh` to skip the frontend build — the API project serves only `/api/*` and `/tts/*` |
+   | `KIT_FRONTEND_BUILD` | `never` | skips the frontend build inside the API project (handled by `vercel.json`) — it serves only `/api/*` and `/tts/*` |
 
 4. **Deploy.** Open `https://vox-api-….vercel.app/api/health` — it should return `{"status":"healthy",…}`. Keep this URL.
 
