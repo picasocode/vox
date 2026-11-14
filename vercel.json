@@ -2,6 +2,12 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "cd /vercel/path0; if [ \"$KIT_FRONTEND_BUILD\" = never ];then mkdir -p frontend/dist;echo '<title>KIT VOX API</title>API only. Web app deployed separately.'>frontend/dist/index.html;else cd frontend && npm i && npm run build;fi",
   "outputDirectory": "frontend/dist",
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 30,
+      "includeFiles": "backend/**, data/**, requirements.txt"
+    }
+  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.py" },
     { "source": "/tts/(.*)", "destination": "/api/index.py" }
