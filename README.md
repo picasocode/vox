@@ -130,21 +130,61 @@ Every request to the college system sends your key in the `X-Participant-Key` he
 
 ## Deploying to Vercel
 
-The repo is Vercel-ready: the React frontend is served by Vercel's CDN and the FastAPI backend runs as a Python serverless function.
+The repo supports two deployment styles. **Option A is the simplest — start there.** Both use the same repository; no code changes are needed either way.
 
-1. Push this repository to GitHub (this repo is pre-configured for it).
-2. In Vercel: **Add New → Project → Import** the repo. Vercel auto-detects the settings from `vercel.json` (frontend build + `/api/*` rewrites) — no manual configuration needed.
-3. Add the environment variables (Project → Settings → Environment Variables):
+### Option A — one project (frontend + backend together)
 
-   | Variable | Value |
-   |---|---|
-   | `KIT_API_BASE_URL` | `https://ht.knowvally.com` |
-   | `KIT_PARTICIPANT_KEY` | your college API key |
-   | `KIT_USE_MOCK` | `false` (omit or leave empty to run on mock data) |
+The React frontend is served by Vercel's CDN and the FastAPI backend runs as a Python serverless function behind `/api/*` and `/tts/*` (configured by `vercel.json`).
 
-4. Deploy. The app is served at the generated `*.vercel.app` URL; microphone permission works there automatically (HTTPS).
+1. Push this repository to GitHub.
+2. In Vercel: **Add New → Project → Import** the repo. All build settings are read from `vercel.json` — leave everything on auto-detect.
+3. Add environment variables (**Settings → Environment Variables**):
 
-Notes: on Vercel the SQLite database and generated audio live in the function's `/tmp` (ephemeral per instance — fine for a demo); locally they live next to the code. If you prefer, deploy with `vercel` CLI: `npm i -g vercel && vercel --prod`.
+   | Variable | Value | Required |
+   |---|---|---|
+   | `KIT_API_BASE_URL` | `https://ht.knowvally.com` | yes |
+   | `KIT_PARTICIPANT_KEY` | your college API key | for live data |
+   | `KIT_USE_MOCK` | `false` | recommended (omit → mock data) |
+
+4. **Deploy.** One `*.vercel.app` URL serves everything; microphone permission works automatically (HTTPS).
+
+### Option B — two projects (API + web, deployed separately)
+
+Use this if you want the backend and frontend as independent Vercel projects (e.g. to redeploy the UI without touching the API).
+
+**Project 1 — API**
+
+1. Import the same repo as a new project (name it e.g. `vox-api`).
+2. Root Directory: leave as the repository root.
+3. Environment variables:
+
+   | Variable | Value | Why |
+   |---|---|---|
+   | `KIT_API_BASE_URL` | `https://ht.knowvally.com` | college API |
+   | `KIT_PARTICIPANT_KEY` | your college API key | live data |
+   | `KIT_USE_MOCK` | `false` | recommended |
+   | `KIT_FRONTEND_BUILD` | `never` | tells `deploy/build.sh` to skip the frontend build — the API project serves only `/api/*` and `/tts/*` |
+
+4. **Deploy.** Open `https://vox-api-….vercel.app/api/health` — it should return `{"status":"healthy",…}`. Keep this URL.
+
+**Project 2 — Web**
+
+1. Import the same repo again as a second project (name it e.g. `vox-web`).
+2. **Root Directory: `frontend`** (Settings → General → Root Directory). Vercel auto-detects Vite; no other build settings needed.
+3. Environment variables:
+
+   | Variable | Value | Why |
+   |---|---|---|
+   | `VITE_API_BASE_URL` | `https://vox-api-….vercel.app` (Project 1's URL, no trailing slash) | tells the app where the API and voice audio live |
+
+4. **Deploy.** Set the variable *before* deploying (it is baked into the build). Changing it later requires a redeploy.
+
+### Notes for both options
+
+- Local development never needs these variables: `./run.sh` works unchanged, and `npm run dev` proxies to `127.0.0.1:8000`.
+- On Vercel the SQLite database lives in the function's `/tmp` (ephemeral per instance — fine for a demo). Locally it lives next to the code.
+- All environment variables are listed with comments in `.env.example` (repo root) and `backend/.env.example`.
+- CLI alternative: `npm i -g vercel && vercel --prod` from the repo root (Option A).
 
 ## Tests
 

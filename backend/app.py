@@ -19,7 +19,7 @@ from backend.tts.synthesizer import tts_synthesizer
 
 app = FastAPI(
     title="KIT VOX Backend",
-    description="Offline Constrained-Vocabulary Speech & Deterministic College Voice Assistant for KIT",
+    description="Voice and text college assistant for Knotopian Institute of Technology",
     version="1.0.0"
 )
 

@@ -1,4 +1,16 @@
-const API_BASE = '/api';
+// Backend origin: empty = same origin (single-project Vercel deploy, local dev).
+// For a separately deployed backend, set VITE_API_BASE_URL at build time,
+// e.g. VITE_API_BASE_URL=https://vox-api.vercel.app
+const BACKEND_ORIGIN =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/+$/, '') || '';
+
+const API_BASE = `${BACKEND_ORIGIN}/api`;
+
+/** Resolve a backend-relative media URL (e.g. /tts/reply.wav) against the backend origin. */
+export function resolveMediaUrl(url: string): string {
+  if (!url || /^(https?:|data:|blob:)/.test(url)) return url;
+  return `${BACKEND_ORIGIN}${url}`;
+}
 
 export interface TurnResponse {
   session_id: string;

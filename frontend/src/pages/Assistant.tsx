@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createSession, loginRole, logoutSession, sendTurn, confirmAction, cancelAction, TurnResponse } from '../lib/api';
+import { createSession, loginRole, logoutSession, sendTurn, confirmAction, cancelAction, resolveMediaUrl, TurnResponse } from '../lib/api';
 import { VoiceConversation } from '../components/VoiceConversation';
 import { TextFallback } from '../components/TextFallback';
 import { ConfirmationPanel } from '../components/ConfirmationPanel';
@@ -45,7 +45,7 @@ export const Assistant: React.FC<AssistantProps> = ({ sessionId, onSessionChange
 
   const playReplyAudio = (audioUrl?: string) => {
     if (!audioUrl) return;
-    const audio = new Audio(audioUrl);
+    const audio = new Audio(resolveMediaUrl(audioUrl));
     audio.playbackRate = 1.0;
     audio.play().catch(() => {});
   };

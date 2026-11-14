@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Loader2, Volume2, VolumeX, RotateCcw, Square, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { AudioRecorder, blobToBase64 } from '../lib/audio_capture';
-import { sendTurn, confirmAction, cancelAction, TurnResponse } from '../lib/api';
+import { sendTurn, confirmAction, cancelAction, resolveMediaUrl, TurnResponse } from '../lib/api';
 import { ConfirmationPanel } from './ConfirmationPanel';
 
 export type ConversationState =
@@ -94,7 +94,7 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
       audioElementRef.current.pause();
     }
 
-    const audio = new Audio(audioUrl);
+    const audio = new Audio(resolveMediaUrl(audioUrl));
     audio.playbackRate = 1.0; // Strictly 1.0x playback speed per specification
     audioElementRef.current = audio;
 
