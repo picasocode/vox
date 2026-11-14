@@ -21,8 +21,8 @@ command -v python3 >/dev/null 2>&1 || PY=python
 echo "Using Python: $($PY --version 2>&1)"
 
 echo
-echo "[1/4] Installing Python dependencies (backend/requirements.txt)..."
-"$PY" -m pip install --quiet --disable-pip-version-check -r backend/requirements.txt \
+echo "[1/4] Installing Python dependencies (requirements.txt)..."
+"$PY" -m pip install --quiet --disable-pip-version-check -r requirements.txt \
   || { echo "  pip install failed. Try: $PY -m pip install --upgrade pip"; exit 1; }
 echo "  done."
 

@@ -17,7 +17,7 @@ Double-click **`run.bat`** (or run it from a terminal). It installs the Python d
 ```
 
 Both scripts do the same four things:
-1. Install Python dependencies from `backend/requirements.txt`
+1. Install Python dependencies from `requirements.txt`
 2. Check the prebuilt frontend in `frontend/dist` (included, so nothing to build)
 3. Start the server with Uvicorn
 4. Open your browser
@@ -40,7 +40,7 @@ You do **not** need Node.js or any build step to use the app — the compiled fr
 
 **Option A — run the finished app (no code, no build):**
 ```bash
-python3 -m pip install -r backend/requirements.txt
+python3 -m pip install -r requirements.txt
 python3 -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
 ```
 Open http://127.0.0.1:8000. That's the whole story; `run.sh` / `run.bat` automate exactly this.
@@ -48,7 +48,7 @@ Open http://127.0.0.1:8000. That's the whole story; `run.sh` / `run.bat` automat
 **Option B — work on the code (frontend hot reload):**
 ```bash
 # Terminal 1 — backend
-python3 -m pip install -r backend/requirements.txt
+python3 -m pip install -r requirements.txt
 python3 -m uvicorn backend.app:app --port 8000
 
 # Terminal 2 — frontend dev server (rebuilds on save)
