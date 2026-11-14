@@ -1,6 +1,5 @@
-# Keep the serverless function bundle small
+# Keep the deployment small (do NOT ignore frontend/dist - that is the build output)
 frontend/node_modules
-frontend/dist
 .git
 backend/__pycache__
 **/__pycache__
