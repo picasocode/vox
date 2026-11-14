@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Loader2, RefreshCw } from 'lucide-react';
 import { AudioRecorder } from '../lib/audio_capture';
-import { sendAudioDirect } from '../lib/api';
+import { sendAudioDirect, isLocalMode } from '../lib/api';
+import { speechRecognitionAvailable, startSpeechRecognition } from '../lib/speech';
 
 interface VoiceWidgetProps {
   onSpeechRecognized: (text: string) => void;
@@ -19,6 +20,8 @@ export const VoiceWidget: React.FC<VoiceWidgetProps> = ({ onSpeechRecognized, di
 
   // Refs
   const recorderRef = useRef<AudioRecorder | null>(null);
+  const recognitionRef = useRef<{ stop: () => void } | null>(null);
+  const usingSpeechRecognitionRef = useRef<boolean>(false);
   const timerRef = useRef<any>(null);
 
   // Recording timer (seconds)
@@ -35,6 +38,37 @@ export const VoiceWidget: React.FC<VoiceWidgetProps> = ({ onSpeechRecognized, di
   }, [isRecording]);
 
   const startRecording = async () => {
+    // Local mode: use the browser's built-in speech recognition when available.
+    if (isLocalMode && speechRecognitionAvailable()) {
+      usingSpeechRecognitionRef.current = true;
+      const handle = startSpeechRecognition({
+        onInterim: (interim) => setStatusMessage(`Heard: "${interim}"`),
+        onFinal: (text) => {
+          setIsRecording(false);
+          setIsProcessing(false);
+          setStatusMessage(`Matched: "${text}"`);
+          onSpeechRecognized(text);
+        },
+        onError: (message) => {
+          setIsRecording(false);
+          setIsProcessing(false);
+          setStatusMessage(message);
+        }
+      });
+      if (handle) {
+        recognitionRef.current = handle;
+        setIsRecording(true);
+        setStatusMessage('Listening… press again to stop');
+        setValidation(null);
+        setPreview(null);
+      } else {
+        setIsRecording(false);
+        setStatusMessage('Speech recognition could not start.');
+      }
+      return;
+    }
+
+    usingSpeechRecognitionRef.current = false;
     const rec = new AudioRecorder();
     const ok = await rec.start();
     if (ok) {
@@ -52,6 +86,16 @@ export const VoiceWidget: React.FC<VoiceWidgetProps> = ({ onSpeechRecognized, di
     setIsRecording(false);
     setIsProcessing(true);
     setStatusMessage('Processing audio…');
+
+    if (usingSpeechRecognitionRef.current) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop(); // onFinal sends the recognized text
+      } else {
+        setIsProcessing(false);
+        setStatusMessage('Recognizer not initialized.');
+      }
+      return;
+    }
 
     if (!recorderRef.current) {
       setStatusMessage('Recorder not initialized.');
@@ -100,6 +144,9 @@ export const VoiceWidget: React.FC<VoiceWidgetProps> = ({ onSpeechRecognized, di
     setValidation(null);
     setPreview(null);
     setStatusMessage('');
+    if (usingSpeechRecognitionRef.current && recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
     if (recorderRef.current) {
       await recorderRef.current.stop(); // ensure any lingering stream is closed
     }
@@ -148,11 +195,11 @@ export const VoiceWidget: React.FC<VoiceWidgetProps> = ({ onSpeechRecognized, di
       {preview && (
         <div className="mt-3 space-y-2 w-full max-w-md">
           <div>
-            <h4 className="font-medium">Master (48 kHz)</h4>
+            <h4 className="font-medium">Master (48 kHz)</h4>
             <audio controls src={URL.createObjectURL(preview.highQuality)} className="w-full" />
           </div>
           <div>
-            <h4 className="font-medium">Recognition (16 kHz)</h4>
+            <h4 className="font-medium">Recognition (16 kHz)</h4>
             <audio controls src={URL.createObjectURL(preview.lowQuality)} className="w-full" />
           </div>
         </div>

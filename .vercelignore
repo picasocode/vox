@@ -1,9 +1,3 @@
-# Keep the deployment small (do NOT ignore frontend/dist - that is the build output)
+# Keep the deployment small
 frontend/node_modules
 .git
-backend/__pycache__
-**/__pycache__
-backend/kit_vox.db
-backend/.env
-backend/tests/__pycache__
-.pyvercel

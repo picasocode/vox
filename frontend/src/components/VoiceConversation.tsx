@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Loader2, Volume2, VolumeX, RotateCcw, Square, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { AudioRecorder, blobToBase64 } from '../lib/audio_capture';
-import { sendTurn, confirmAction, cancelAction, resolveMediaUrl, TurnResponse } from '../lib/api';
+import { sendTurn, confirmAction, cancelAction, resolveMediaUrl, isLocalMode, TurnResponse } from '../lib/api';
+import { speechRecognitionAvailable, startSpeechRecognition, speakText, stopSpeaking } from '../lib/speech';
 import { ConfirmationPanel } from './ConfirmationPanel';
 
 export type ConversationState =
@@ -57,6 +58,8 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
   const [lastAudioUrl, setLastAudioUrl] = useState<string | null>('/tts/welcome.wav');
 
   const recorderRef = useRef<AudioRecorder | null>(null);
+  const recognitionRef = useRef<{ stop: () => void } | null>(null);
+  const usingSpeechRecognitionRef = useRef<boolean>(false);
   const timerRef = useRef<any>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const conversationEndRef = useRef<HTMLDivElement | null>(null);
@@ -127,11 +130,37 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
     });
   };
 
+  /** Speak dynamic assistant text with the browser's speech synthesis (no recorded WAV available). */
+  const speakDynamicResponse = (text: string, nextState: ConversationState = 'IDLE') => {
+    if (isMuted) {
+      setState(nextState);
+      setStatusText('Assistant response ready (Audio muted)');
+      return;
+    }
+    setState('SPEAKING');
+    setStatusText('Speaking response...');
+    const spoke = speakText(text, () => {
+      setState(nextState);
+      setStatusText(
+        nextState === 'WAITING_FOR_CONFIRMATION'
+          ? 'Awaiting your confirmation ("yes" or "no")'
+          : nextState === 'WAITING_FOR_CLARIFICATION'
+          ? 'Awaiting clarification details...'
+          : 'Ready for your next question.'
+      );
+    });
+    if (!spoke) {
+      setState(nextState);
+      setStatusText('Response ready');
+    }
+  };
+
   const stopAudio = () => {
     if (audioElementRef.current) {
       audioElementRef.current.pause();
       audioElementRef.current.currentTime = 0;
     }
+    stopSpeaking();
     setState('STOPPED');
     setStatusText('Audio playback stopped.');
   };
@@ -150,11 +179,97 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
     }
   };
 
-  // Start microphone capture
+  /** Shared post-processing of an assistant turn (used by both mic paths). */
+  const processAssistantResponse = (res: TurnResponse) => {
+    const recognized = res.recognized_text;
+    const userTurn: ConversationTurn = {
+      id: String(Date.now()),
+      sender: 'user',
+      text: recognized ? recognized : '(Speech wasn\u2019t clear enough to match a command)',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    const assistantTurn: ConversationTurn = {
+      id: String(Date.now() + 1),
+      sender: 'assistant',
+      text: res.assistant_text,
+      audioUrl: res.audio_url,
+      intent: res.intent,
+      module: res.module,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    setTurns((prev) => [...prev, userTurn, assistantTurn]);
+
+    let nextState: ConversationState = 'IDLE';
+    if (res.needs_confirmation && res.pending_action) {
+      setPendingAction(res.pending_action);
+      nextState = 'WAITING_FOR_CONFIRMATION';
+    } else if (res.assistant_text.includes('Which date') || res.assistant_text.includes('reason')) {
+      setPendingAction(null);
+      nextState = 'WAITING_FOR_CLARIFICATION';
+    } else {
+      setPendingAction(null);
+    }
+
+    if (onTurnComplete) onTurnComplete(res);
+
+    // Automatically play response voice (recorded WAV, else browser TTS)
+    if (res.audio_url) {
+      playVoiceResponse(res.audio_url, nextState);
+    } else {
+      speakDynamicResponse(res.assistant_text, nextState);
+    }
+  };
+
+  /** Send a recognized text utterance through the assistant (speech-recognition path). */
+  const sendRecognizedText = async (text: string) => {
+    setState('RESPONDING');
+    setStatusText('Formulating agent response...');
+    try {
+      const res: TurnResponse = await sendTurn(sessionId, text);
+      processAssistantResponse(res);
+    } catch (err: any) {
+      setState('ERROR');
+      setStatusText('Turn processing failure.');
+      setAudioError(err.message || 'Error communicating with assistant backend.');
+    }
+  };
+
+  // Start microphone capture (speech recognition in local mode, WAV recorder otherwise)
   const startRecording = async () => {
     if (state === 'SPEAKING') stopAudio();
     setAudioError(null);
 
+    if (isLocalMode && speechRecognitionAvailable()) {
+      usingSpeechRecognitionRef.current = true;
+      const handle = startSpeechRecognition({
+        onInterim: (interim) => {
+          setStatusText(`Heard: "${interim}"`);
+        },
+        onFinal: (text) => {
+          setState('PROCESSING');
+          setStatusText('Recognizing speech...');
+          sendRecognizedText(text);
+        },
+        onError: (message) => {
+          setState('ERROR');
+          setStatusText('Speech recognition error.');
+          setAudioError(message);
+        }
+      });
+      if (handle) {
+        recognitionRef.current = handle;
+        setState('LISTENING');
+        setStatusText('Listening... Speak now.');
+      } else {
+        setState('ERROR');
+        setStatusText('Speech recognition could not start.');
+      }
+      return;
+    }
+
+    usingSpeechRecognitionRef.current = false;
     const rec = new AudioRecorder();
     const ok = await rec.start();
     if (ok) {
@@ -168,8 +283,17 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
     }
   };
 
-  // Stop recording and process turn
+  // Stop capture and process the turn
   const stopRecordingAndSend = async () => {
+    if (usingSpeechRecognitionRef.current) {
+      setState('PROCESSING');
+      setStatusText('Recognizing speech...');
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      return;
+    }
+
     setState('PROCESSING');
     setStatusText('Recognizing speech...');
 
@@ -193,49 +317,7 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
       setState('RESPONDING');
       setStatusText('Formulating agent response...');
       const res: TurnResponse = await sendTurn(sessionId, undefined, base64Wav);
-
-      // Add user turn
-      const recognized = res.recognized_text;
-      const userTurn: ConversationTurn = {
-        id: String(Date.now()),
-        sender: 'user',
-        text: recognized ? recognized : '(Speech wasn\u2019t clear enough to match a command)',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-
-      // Add assistant turn
-      const assistantTurn: ConversationTurn = {
-        id: String(Date.now() + 1),
-        sender: 'assistant',
-        text: res.assistant_text,
-        audioUrl: res.audio_url,
-        intent: res.intent,
-        module: res.module,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-
-      setTurns((prev) => [...prev, userTurn, assistantTurn]);
-
-      let nextState: ConversationState = 'IDLE';
-      if (res.needs_confirmation && res.pending_action) {
-        setPendingAction(res.pending_action);
-        nextState = 'WAITING_FOR_CONFIRMATION';
-      } else if (res.assistant_text.includes('Which date') || res.assistant_text.includes('reason')) {
-        setPendingAction(null);
-        nextState = 'WAITING_FOR_CLARIFICATION';
-      } else {
-        setPendingAction(null);
-      }
-
-      if (onTurnComplete) onTurnComplete(res);
-
-      // Automatically play response voice
-      if (res.audio_url) {
-        playVoiceResponse(res.audio_url, nextState);
-      } else {
-        setState(nextState);
-        setStatusText('Response ready');
-      }
+      processAssistantResponse(res);
     } catch (err: any) {
       setState('ERROR');
       setStatusText('Turn processing failure.');
@@ -254,7 +336,11 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
 
   const handleRetry = async () => {
     if (state === 'LISTENING') {
-      if (recorderRef.current) await recorderRef.current.stop();
+      if (usingSpeechRecognitionRef.current && recognitionRef.current) {
+        recognitionRef.current.stop();
+      } else if (recorderRef.current) {
+        await recorderRef.current.stop();
+      }
     }
     stopAudio();
     await startRecording();

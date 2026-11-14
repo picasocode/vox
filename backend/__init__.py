@@ -1,1 +1,0 @@
-"""KIT VOX backend package."""

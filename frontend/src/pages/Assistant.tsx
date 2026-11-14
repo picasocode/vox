@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createSession, loginRole, logoutSession, sendTurn, confirmAction, cancelAction, resolveMediaUrl, TurnResponse } from '../lib/api';
+import { createSession, loginRole, logoutSession, sendTurn, confirmAction, cancelAction, resolveMediaUrl, isLocalMode, TurnResponse } from '../lib/api';
+import { speakText, stopSpeaking } from '../lib/speech';
 import { VoiceConversation } from '../components/VoiceConversation';
 import { TextFallback } from '../components/TextFallback';
 import { ConfirmationPanel } from '../components/ConfirmationPanel';
@@ -43,11 +44,17 @@ export const Assistant: React.FC<AssistantProps> = ({ sessionId, onSessionChange
 
   const nowStamp = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  const playReplyAudio = (audioUrl?: string) => {
-    if (!audioUrl) return;
-    const audio = new Audio(resolveMediaUrl(audioUrl));
-    audio.playbackRate = 1.0;
-    audio.play().catch(() => {});
+  const playReplyAudio = (audioUrl?: string, text?: string) => {
+    if (audioUrl) {
+      const audio = new Audio(resolveMediaUrl(audioUrl));
+      audio.playbackRate = 1.0;
+      audio.play().catch(() => {});
+      return;
+    }
+    // No recorded WAV for this reply: speak it with the browser's voice (local mode only)
+    if (isLocalMode && text) {
+      speakText(text);
+    }
   };
 
   const handleTextSend = async (text: string) => {
@@ -71,7 +78,7 @@ export const Assistant: React.FC<AssistantProps> = ({ sessionId, onSessionChange
       } else {
         setPendingAction(null);
       }
-      playReplyAudio(res.audio_url);
+      playReplyAudio(res.audio_url, res.assistant_text);
     } catch (e: any) {
       setTurns((prev) => [
         ...prev,
@@ -90,7 +97,7 @@ export const Assistant: React.FC<AssistantProps> = ({ sessionId, onSessionChange
         { id: String(Date.now() + 1), sender: 'assistant', text: res.message || 'Action executed successfully.', audioUrl: res.audio_url, timestamp: nowStamp() }
       ]);
       setPendingAction(null);
-      playReplyAudio(res.audio_url);
+      playReplyAudio(res.audio_url, res.message);
     } catch (e: any) {
       setTurns((prev) => [...prev, { id: String(Date.now() + 1), sender: 'assistant', text: `⚠️ ${e.message || 'Confirmation failed'}`, timestamp: nowStamp() }]);
     }
@@ -106,7 +113,7 @@ export const Assistant: React.FC<AssistantProps> = ({ sessionId, onSessionChange
         { id: String(Date.now() + 1), sender: 'assistant', text: res.message || 'Action cancelled.', audioUrl: res.audio_url, timestamp: nowStamp() }
       ]);
       setPendingAction(null);
-      playReplyAudio(res.audio_url);
+      playReplyAudio(res.audio_url, res.message);
     } catch (e: any) {
       setTurns((prev) => [...prev, { id: String(Date.now() + 1), sender: 'assistant', text: `⚠️ ${e.message || 'Cancellation failed'}`, timestamp: nowStamp() }]);
     }
@@ -131,6 +138,7 @@ export const Assistant: React.FC<AssistantProps> = ({ sessionId, onSessionChange
 
   const handleLogout = async () => {
     setLoading(true);
+    stopSpeaking();
     await logoutSession(sessionId);
     const sess = await createSession();
     onSessionChange(sess.session_id);
