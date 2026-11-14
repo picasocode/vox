@@ -14,3 +14,4 @@ files/
 files.zip
 SKILL.md
 .vercel/
+.vercel_python_packages/
